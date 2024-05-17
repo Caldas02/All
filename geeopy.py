@@ -4,11 +4,21 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+import time
 
-def get_location(lat, lon):
-    geolocator = Nominatim(user_agent="geo_locator")
-    location = geolocator.reverse((lat, lon), language='en')
-    return location.address if location else "Location not found"
+# Function to get the location using Nominatim geolocator with retries
+def get_location(lat, lon, retries=3, delay=2):
+    geolocator = Nominatim(user_agent="geo_locator", timeout=10)
+    for attempt in range(retries):
+        try:
+            location = geolocator.reverse((lat, lon), language='en')
+            return location.address if location else "Location not found"
+        except (GeocoderTimedOut, GeocoderUnavailable) as e:
+            if attempt < retries - 1:
+                time.sleep(delay)  # Wait before retrying
+            else:
+                return "Geocoding service unavailable"
 
 def main():
     st.title("Location Finder")
@@ -46,11 +56,11 @@ def main():
                 location_name = row['Location Name']
                 folium.Marker([lat, lon], popup=location_name).add_to(my_map)
 
-            # Display the map using markdown
+            # Display the map using folium_static
             folium_static(my_map)
 
             # Save the DataFrame with location names to the specified directory
-            output_directory = "C:\\Users\\Caldas\\Desktop"
+            output_directory = os.path.expanduser("~/Desktop")
             txt_filename = os.path.join(output_directory, "location_names.txt")
             with open(txt_filename, 'w', encoding='utf-8') as txt_file:
                 for location_name in location_names:
